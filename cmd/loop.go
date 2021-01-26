@@ -64,7 +64,7 @@ type loopInfo struct {
 }
 
 type loopDevice struct {
-	*os.File
+	path string
 	info loopInfo
 }
 
@@ -95,20 +95,21 @@ func Attach(path string) (loopDevice, error) {
 		return loopDevice{}, err
 	}
 
-	var dev loopDevice
-	dev.File, err = os.Open(fmt.Sprintf("/dev/loop%d", freeFd))
+	dev := loopDevice{path: fmt.Sprintf("/dev/loop%d", freeFd)}
+	devFd, err := os.Open(dev.path)
 	if err != nil {
 		return loopDevice{}, err
 	}
 
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, dev.File.Fd(), LoopSetFd, backingFile.Fd())
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, devFd.Fd(), LoopSetFd, backingFile.Fd())
+
 	if errno != 0 {
 		return loopDevice{}, errors.New(fmt.Sprintf("Recieved errno %d", errno))
 	}
 
 	info := loopInfo{LoFlags: LoFlagsPartscan}
 
-	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, dev.Fd(), LoopSetStatus64, uintptr(unsafe.Pointer(&info)))
+	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, devFd.Fd(), LoopSetStatus64, uintptr(unsafe.Pointer(&info)))
 	if errno != 0 {
 		return loopDevice{}, errors.New(fmt.Sprintf("Recieved errno %d", errno))
 	}
@@ -116,4 +117,19 @@ func Attach(path string) (loopDevice, error) {
 	dev.info = info
 
 	return dev, nil
+}
+
+// Detach a loopback device from a backing file
+func Detach(dev loopDevice) error {
+	
+	devFd, err := os.Open(dev.path)
+	if err != nil {
+		return err
+	}
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, devFd.Fd(), LoopClrFd, 0)
+	if errno != 0 {
+		return errors.New(fmt.Sprintf("Recieved errno %d", errno))
+	}
+	
+	return nil
 }
