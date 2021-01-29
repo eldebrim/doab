@@ -74,9 +74,9 @@ func getFreeLoopbackDev() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	fd, _, err := syscall.Syscall(syscall.SYS_IOCTL, loopControl.Fd(), LoopCtlGetFree, 0)
-	if fd < 0 || err != nil {
-		return uint64(fd), err
+	fd, _, errno := syscall.Syscall(syscall.SYS_IOCTL, loopControl.Fd(), LoopCtlGetFree, 0)
+	if fd < 0 || errno != 0 {
+		return uint64(fd), errors.New(fmt.Sprintf("%d", errno))
 	}
 
 	return uint64(fd), nil
@@ -100,6 +100,7 @@ func Attach(path string) (loopDevice, error) {
 	if err != nil {
 		return loopDevice{}, err
 	}
+	defer devFd.Close()
 
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, devFd.Fd(), LoopSetFd, backingFile.Fd())
 
@@ -121,15 +122,17 @@ func Attach(path string) (loopDevice, error) {
 
 // Detach a loopback device from a backing file
 func Detach(dev loopDevice) error {
-	
+
 	devFd, err := os.Open(dev.path)
 	if err != nil {
 		return err
 	}
+	defer devFd.Close()
+
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, devFd.Fd(), LoopClrFd, 0)
 	if errno != 0 {
 		return errors.New(fmt.Sprintf("Recieved errno %d", errno))
 	}
-	
+
 	return nil
 }
