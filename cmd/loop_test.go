@@ -62,7 +62,7 @@ func TestDetach(t *testing.T) {
 		log.Fatal(err)
 	}
 	// wait for a bit so detach operation completes
-	time.Sleep(4 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	losetupOut, err = exec.Command("losetup", "--list").Output()
 	if err != nil {
